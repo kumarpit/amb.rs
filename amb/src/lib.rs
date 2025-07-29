@@ -44,16 +44,16 @@ where
 {
     match stmts.next() {
         Some(stmt) => {
-            if let Some((pat, iterable_tokens)) = extract_choice(stmt) {
+            if let Some((pat, iterable)) = extract_choice(stmt) {
                 let inner = build_amb(stmts, final_expr, IteratorStage::Nested);
                 return match stage {
                     IteratorStage::First => quote! {
-                        (#iterable_tokens).into_iter().flat_map(move |#pat| {
+                        (#iterable).into_iter().flat_map(move |#pat| {
                             #inner
                         })
                     },
                     IteratorStage::Nested => quote! {
-                        (#iterable_tokens).into_iter().filter_map(move |#pat| {
+                        (#iterable).into_iter().filter_map(move |#pat| {
                             #inner
                         })
                     },
