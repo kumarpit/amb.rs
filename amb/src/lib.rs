@@ -1,98 +1,108 @@
 use quote::quote;
 use syn::{Block, Expr, Stmt, StmtMacro, spanned::Spanned};
 
+/// The `amb!` macro enables backtracking search over a space of choices.
+///
+/// It supports three types of statements:
+/// - `let <pat> = choice!(<iter>)` — introduces a non-deterministic choice.
+/// - `require!(<cond>)` — prunes execution paths that don't satisfy the predicate.
+/// - Any other statement is executed normally.
+///
+/// The block must end in a pure expression (not a semicolon-terminated statement).
 #[proc_macro]
 pub fn amb(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let block = syn::parse_macro_input!(input as Block);
-    if let Some((last, stmts)) = block.stmts.split_last() {
-        match last {
-            // The last statement in the amb block must evaluate to a value
-            Stmt::Expr(expr, None) => parse_amb_block(stmts.iter(), expr, true).into(),
-            _ => syn::Error::new(last.span(), "The amb! block must end with an expression")
-                .to_compile_error()
-                .into(),
+
+    match block.stmts.split_last() {
+        Some((Stmt::Expr(expr, None), rest)) => {
+            build_amb(rest.iter(), expr, IteratorStage::First).into()
         }
-    } else {
-        // An empty block produces an empty iterator
-        quote!(std::iter::empty::<()>()).into()
+        Some((last_stmt, _)) => syn::Error::new(
+            last_stmt.span(),
+            "The amb! block must end with an expression",
+        )
+        .to_compile_error()
+        .into(),
+        None => quote!(std::iter::empty::<()>()).into(),
     }
 }
 
-fn parse_amb_block<'a, I>(
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum IteratorStage {
+    First,
+    Nested,
+}
+
+/// Recursively desugars `amb!` block into nested iterators and conditions.
+fn build_amb<'a, I>(
     mut stmts: I,
     final_expr: &Expr,
-    is_first_iterator: bool,
+    stage: IteratorStage,
 ) -> proc_macro2::TokenStream
 where
     I: Iterator<Item = &'a Stmt> + Clone,
 {
-    if let Some(stmt) = stmts.next() {
-        let mut pat = None;
-        let mut iterable = None;
+    match stmts.next() {
+        Some(stmt) => {
+            if let Some((pat, iterable_tokens)) = extract_choice(stmt) {
+                let inner = build_amb(stmts, final_expr, IteratorStage::Nested);
+                return match stage {
+                    IteratorStage::First => quote! {
+                        (#iterable_tokens).into_iter().flat_map(move |#pat| {
+                            #inner
+                        })
+                    },
+                    IteratorStage::Nested => quote! {
+                        (#iterable_tokens).into_iter().filter_map(move |#pat| {
+                            #inner
+                        })
+                    },
+                };
+            }
 
-        // Case 1: `let <pat> = choice!(<iterable>);`
-        if let Stmt::Local(local) = stmt {
-            // Matches the part including and after the =
-            if let Some(init) = &local.init {
-                // The iterable must be wrapped in the `choice!` macro
-                if let Expr::Macro(expr_macro) = &*init.expr {
-                    if expr_macro.mac.path.is_ident("choice") {
-                        pat = Some(&local.pat);
-                        iterable = Some(&expr_macro.mac.tokens);
+            if let Some(pred) = extract_require(stmt) {
+                let inner = build_amb(stmts, final_expr, stage);
+                return quote! {
+                    if #pred {
+                        #inner
+                    } else {
+                        None
                     }
-                }
-            }
-        }
-
-        let is_case_1 = pat.is_some();
-        let inner_iterator = parse_amb_block(
-            stmts,
-            final_expr,
-            if is_first_iterator && is_case_1 {
-                false
-            } else {
-                true
-            },
-        );
-
-        if is_case_1 {
-            if is_first_iterator {
-                return quote! {
-                    (#iterable).into_iter().flat_map(move |#pat| {
-                        #inner_iterator
-                    })
-                };
-            } else {
-                return quote! {
-                    (#iterable).into_iter().filter_map(move |#pat| {
-                        #inner_iterator
-                    })
                 };
             }
+
+            // Fallback: treat as a normal statement
+            let inner = build_amb(stmts, final_expr, stage);
+            quote!({
+                #stmt
+                #inner
+            })
         }
 
-        // Case 2: `require!(<pred>)`
-        if let Stmt::Macro(StmtMacro { mac, .. }) = stmt {
-            if mac.path.is_ident("require") {
-                if let Ok(pred) = mac.parse_body::<Expr>() {
-                    return quote! {
-                        if #pred {
-                            #inner_iterator
-                        } else {
-                            None
-                        }
-                    };
+        None => quote!(Some(#final_expr)),
+    }
+}
+
+/// Extracts `let <pat> = choice!(<expr>)` pattern.
+fn extract_choice(stmt: &Stmt) -> Option<(&syn::Pat, &proc_macro2::TokenStream)> {
+    match stmt {
+        Stmt::Local(local) => {
+            let init_expr = local.init.as_ref()?.expr.as_ref();
+            if let Expr::Macro(mac_expr) = init_expr {
+                if mac_expr.mac.path.is_ident("choice") {
+                    return Some((&local.pat, &mac_expr.mac.tokens));
                 }
             }
+            None
         }
+        _ => None,
+    }
+}
 
-        // Case 3: Any other statement is simply prepended.
-        return quote!({
-            #stmt
-            #inner_iterator
-        });
-    } else {
-        // Base case
-        quote!(Some(#final_expr))
+/// Extracts `require!(<predicate>)` pattern.
+fn extract_require(stmt: &Stmt) -> Option<Expr> {
+    match stmt {
+        Stmt::Macro(StmtMacro { mac, .. }) if mac.path.is_ident("require") => mac.parse_body().ok(),
+        _ => None,
     }
 }
