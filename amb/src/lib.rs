@@ -13,15 +13,34 @@ use syn::{Block, Expr, Stmt, StmtMacro, spanned::Spanned};
 pub fn amb(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let block = syn::parse_macro_input!(input as Block);
 
+    // The amb! block must end in an implicit/explicit return
     match block.stmts.split_last() {
         Some((Stmt::Expr(expr, None), rest)) => build_amb(rest.iter(), expr).into(),
+        Some((Stmt::Expr(expr, Some(_)), rest)) => {
+            match expr {
+                Expr::Return(returned_expr) => {
+                    if let Some(return_value) = returned_expr.expr.as_ref() {
+                        build_amb(rest.iter(), return_value).into()
+                    } else {
+                        syn::Error::new(expr.span(), 
+                            "The amb! block cannot end with en empty return. It must return a value.")
+                        .to_compile_error()
+                        .into()
+                    }
+                }
+                _ => syn::Error::new(expr.span(), 
+                    "The amb! block must end with an expression")
+                    .to_compile_error()
+                    .into(),
+            }
+        }
+        None => quote!(std::iter::empty::<()>()).into(),
         Some((last_stmt, _)) => syn::Error::new(
             last_stmt.span(),
             "The amb! block must end with an expression",
         )
         .to_compile_error()
         .into(),
-        None => quote!(std::iter::empty::<()>()).into(),
     }
 }
 
