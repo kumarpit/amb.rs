@@ -80,13 +80,6 @@ let solution = amb!({
 
     require!(is_valid_assignment(&assignment));
 
-    return (
-        assignment[&Node::A],
-        assignment[&Node::B],
-        assignment[&Node::C],
-        assignment[&Node::D],
-        assignment[&Node::E],
-        assignment[&Node::F],
-    );
+    return assignment;
 })
 ```
