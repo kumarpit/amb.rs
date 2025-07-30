@@ -81,7 +81,7 @@ mod tests {
             Blue,
         }
 
-        #[derive(Eq, PartialEq, Hash, Clone)]
+        #[derive(Eq, PartialEq, Debug, Hash, Clone)]
         enum Node {
             A,
             B,
@@ -91,7 +91,6 @@ mod tests {
             F,
         }
 
-        // Note: Assumes index is in bounds!!!
         let colors = vec![Color::Red, Color::Yellow, Color::Green, Color::Blue];
         let num_colors = colors.len();
 
@@ -106,6 +105,7 @@ mod tests {
 
         // Need to define these closures outside nested iterators to avoid moving adjacency_list, colors into FnMuts
 
+        // Note: Assumes index is in bounds!!!
         let get_color = |a: usize| colors[a];
 
         // Given color assignments for each node, checks whether they satisy the constraint that no
@@ -116,18 +116,10 @@ mod tests {
                 .flat_map(|(node, neighbours)| {
                     neighbours.iter().map(move |neighbour| (node, neighbour))
                 })
-                .all(|(node, neighbour)| {
-                    if let (Some(node_color), Some(neighbour_color)) =
-                        (assignment.get(node), assignment.get(neighbour))
-                    {
-                        node_color != neighbour_color
-                    } else {
-                        false // Should never be here
-                    }
-                })
+                .all(|(node, neighbour)| assignment[node] != assignment[neighbour])
         };
 
-        let solution = amb!({
+        let mut solution = amb!({
             let a = choice!(0..num_colors);
             let b = choice!(0..num_colors);
             let c = choice!(0..num_colors);
@@ -146,18 +138,10 @@ mod tests {
 
             require!(is_valid_assignment(&assignment));
 
-            return (
-                assignment[&Node::A],
-                assignment[&Node::B],
-                assignment[&Node::C],
-                assignment[&Node::D],
-                assignment[&Node::E],
-                assignment[&Node::F],
-            );
-        })
-        .next();
+            assignment
+        });
 
-        println!("Solution: {:?}", solution);
+        println!("Solution: {:?}", solution.next());
     }
 
     ///////////////////////////
@@ -166,7 +150,7 @@ mod tests {
 
     #[test]
     fn eight_queens() {
-        let solution = amb!({
+        let mut solution = amb!({
             let col1 = choice!(1..=8);
             let col2 = choice!(1..=8);
             let col3 = choice!(1..=8);
@@ -176,27 +160,21 @@ mod tests {
             let col7 = choice!(1..=8);
             let col8 = choice!(1..=8);
 
-            let row_assignments_for_column = vec![col1, col2, col3, col4, col5, col6, col7, col8];
+            let row_assignments: Vec<usize> = vec![col1, col2, col3, col4, col5, col6, col7, col8];
 
             require!((1..=7).into_iter().all(|upto_column| {
                 (0..upto_column).into_iter().all(|curr_column| {
-                    // Ensure different rows
-                    row_assignments_for_column[curr_column]
-                        != row_assignments_for_column[upto_column]
-
-                        // Ensure not on same diagonals
-                        && (upto_column as i32 - curr_column as i32).abs()
-                            != (row_assignments_for_column[upto_column] as i32
-                                - row_assignments_for_column[curr_column] as i32)
-                                .abs()
+                    let row1 = row_assignments[curr_column];
+                    let row2 = row_assignments[upto_column];
+                    // Ensure queens are in different rows and not on the same diagonal
+                    row1 != row2 && upto_column.abs_diff(curr_column) != row1.abs_diff(row2)
                 })
             }));
 
-            row_assignments_for_column
-        })
-        .next();
+            row_assignments
+        });
 
-        render_board(&solution.unwrap());
+        render_board(solution.next().as_deref());
     }
 
     // FOR TESTING
@@ -210,7 +188,13 @@ mod tests {
     // 3 . . . . Q . . .
     // 2 . . . . . . Q .
     // 1 Q . . . . . . .
-    fn render_board(solution: &[usize]) {
+    fn render_board(solution_opt: Option<&[usize]>) {
+        if solution_opt.is_none() {
+            return;
+        }
+
+        let solution = solution_opt.unwrap();
+
         if solution.len() != 8 {
             println!("Error: Solution must have exactly 8 values.");
             return;
