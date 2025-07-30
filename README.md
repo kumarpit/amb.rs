@@ -94,13 +94,12 @@ let solution = amb!({
     let col7 = choice!(1..=8);
     let col8 = choice!(1..=8);
 
-    let row_assignments = vec![col1, col2, col3, col4, col5, col6, col7, col8];
+    let row_assignments: Vec<usize> = vec![col1, col2, col3, col4, col5, col6, col7, col8];
 
     require!((1..=7).into_iter().all(|upto_column| {
         (0..upto_column).into_iter().all(|curr_column| {
-            let row1 = row_assignments[curr_column] as usize;
-            let row2 = row_assignments[upto_column] as usize;
-
+            let row1 = row_assignments[curr_column];
+            let row2 = row_assignments[upto_column];
             // Ensure queens are in different rows and not on the same diagonal
             row1 != row2 && upto_column.abs_diff(curr_column) != row1.abs_diff(row2)
         })
