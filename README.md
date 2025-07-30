@@ -37,8 +37,11 @@ if !<#pred> {
 Note that this means you must only define constraints _after_ you have defined all your ambiguous variables.
 
 For more interesting examples, consider the map coloring problem described [here](https://www.metalevel.at/prolog/optimization). Our task is to find color assigments for the nodes such that no two adjacent nodes share the same color. Here is the map:
+
 <img width="343" height="249" alt="image" src="https://github.com/user-attachments/assets/57c1c616-ea85-4e1e-9c83-1a1cc9bc7256" />
+
 ```rust
+// <-- snip --> (ommitted enum definitions for brevity)
 let colors = vec![Color::Red, Color::Yellow, Color::Green, Color::Blue];
 let adjacency_list = HashMap::from([
     (Node::A, vec![Node::B, Node::C, Node::D, Node::F]),
