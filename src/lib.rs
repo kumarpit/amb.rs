@@ -1,3 +1,11 @@
+macro_rules! require {
+    ($pred:expr) => {
+        if !$pred {
+            return None;
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use amb::amb;
@@ -55,9 +63,11 @@ mod tests {
 
     use std::collections::{HashMap, HashSet};
 
+    // TODO: I've got to figure out how to fix these clones
+
     #[test]
     fn map_coloring() {
-        #[derive(Eq, PartialEq, Hash, Copy, Clone)]
+        #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
         enum Color {
             Red,
             Green,
@@ -65,7 +75,7 @@ mod tests {
             Blue,
         }
 
-        #[derive(Eq, PartialEq, Hash)]
+        #[derive(Eq, PartialEq, Hash, Clone)]
         enum Node {
             A,
             B,
@@ -75,33 +85,60 @@ mod tests {
             F,
         }
 
-        let colors: HashSet<Color> =
-            HashSet::from([Color::Red, Color::Green, Color::Yellow, Color::Blue]);
-
-        let adjacency_list = HashMap::from([
-            (Node::A, vec![Node::B, Node::C, Node::D, Node::F]),
-            (Node::B, vec![Node::A, Node::C, Node::D]),
-            (Node::C, vec![Node::A, Node::B, Node::D, Node::E]),
-            (Node::D, vec![Node::A, Node::B, Node::C, Node::E, Node::F]),
-            (Node::E, vec![Node::C, Node::D, Node::F]),
-            (Node::F, vec![Node::A, Node::D, Node::E]),
-        ]);
-
-        amb!({
-            let a = choice!(&colors);
-            let b = choice!(&colors);
-            let c = choice!(&colors);
-            let d = choice!(&colors);
-            let e = choice!(&colors);
-            let f = choice!(&colors);
+        let solution = amb!({
+            let a = choice!(HashSet::from([
+                Color::Red,
+                Color::Green,
+                Color::Yellow,
+                Color::Blue
+            ]));
+            let b = choice!(HashSet::from([
+                Color::Red,
+                Color::Green,
+                Color::Yellow,
+                Color::Blue
+            ]));
+            let c = choice!(HashSet::from([
+                Color::Red,
+                Color::Green,
+                Color::Yellow,
+                Color::Blue
+            ]));
+            let d = choice!(HashSet::from([
+                Color::Red,
+                Color::Green,
+                Color::Yellow,
+                Color::Blue
+            ]));
+            let e = choice!(HashSet::from([
+                Color::Red,
+                Color::Green,
+                Color::Yellow,
+                Color::Blue
+            ]));
+            let f = choice!(HashSet::from([
+                Color::Red,
+                Color::Green,
+                Color::Yellow,
+                Color::Blue
+            ]));
 
             let assignment = HashMap::from([
-                (Node::A, &a),
-                (Node::B, &b),
-                (Node::C, &c),
-                (Node::D, &d),
-                (Node::E, &e),
-                (Node::F, &f),
+                (Node::A, a),
+                (Node::B, b),
+                (Node::C, c),
+                (Node::D, d),
+                (Node::E, e),
+                (Node::F, f),
+            ]);
+
+            let adjacency_list = HashMap::from([
+                (Node::A, vec![Node::B, Node::C, Node::D, Node::F]),
+                (Node::B, vec![Node::A, Node::C, Node::D]),
+                (Node::C, vec![Node::A, Node::B, Node::D, Node::E]),
+                (Node::D, vec![Node::A, Node::B, Node::C, Node::E, Node::F]),
+                (Node::E, vec![Node::C, Node::D, Node::F]),
+                (Node::F, vec![Node::A, Node::D, Node::E]),
             ]);
 
             for (node, neighbours) in adjacency_list {
@@ -110,8 +147,10 @@ mod tests {
                 }
             }
 
-            return (*a, *b, *c, *d, *e, *f);
+            return (a, b, c, d, e, f);
         })
         .next();
+
+        println!("Solution: {:?}", solution);
     }
 }

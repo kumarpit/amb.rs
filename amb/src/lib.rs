@@ -56,7 +56,7 @@ fn build_amb<'a, I>(stmts: I, final_expr: &Expr) -> proc_macro2::TokenStream
 where
     I: Iterator<Item = &'a Stmt> + Clone,
 {
-    let (_, expanded) = build_amb_rec(stmts, final_expr);
+    let (_, expanded) = build_amb_rec(stmts, final_expr, true);
     expanded
 }
 
@@ -64,6 +64,7 @@ where
 fn build_amb_rec<'a, I>(
     mut stmts: I,
     final_expr: &Expr,
+    first_call: bool,
 ) -> (IteratorStage, proc_macro2::TokenStream)
 where
     I: Iterator<Item = &'a Stmt> + Clone,
@@ -71,43 +72,46 @@ where
     match stmts.next() {
         Some(stmt) => {
             if let Some((pat, iterable)) = extract_choice(stmt) {
-                let (iterator_stage, inner) = build_amb_rec(stmts, final_expr);
+                let (iterator_stage, inner) = build_amb_rec(stmts, final_expr, false);
                 return match iterator_stage {
                     IteratorStage::InnerMost => (
                         IteratorStage::Outer,
+                        if first_call {
+                        quote! {
+                            (#iterable).into_iter().filter_map(|#pat| {
+                                #inner
+                            })
+                        }
+
+                        } else {
                         quote! {
                             (#iterable).into_iter().filter_map(move |#pat| {
                                 #inner
                             })
-                        },
+                        }
+                        }
                     ),
                     IteratorStage::Outer => (
                         IteratorStage::Outer,
+                        if first_call {
+                        quote! {
+                            (#iterable).into_iter().flat_map(|#pat| {
+                                #inner
+                            })
+                        }
+                        } else {
                         quote! {
                             (#iterable).into_iter().flat_map(move |#pat| {
                                 #inner
                             })
-                        },
+                        }
+                        }
                     ),
                 };
             }
 
-            if let Some(pred) = extract_require(stmt) {
-                let (iterator_stage, inner) = build_amb_rec(stmts, final_expr);
-                return (
-                    iterator_stage,
-                    quote! {
-                        if #pred {
-                            #inner
-                        } else {
-                            None
-                        }
-                    },
-                );
-            }
-
             // Fallback: treat as a normal statement
-            let (iterator_stage, inner) = build_amb_rec(stmts, final_expr);
+            let (iterator_stage, inner) = build_amb_rec(stmts, final_expr, first_call);
             (
                 iterator_stage,
                 quote!({
@@ -121,7 +125,8 @@ where
     }
 }
 
-/// Extracts `let <pat> = choice!(<expr>)` pattern.
+/// Extracts `let <pat> = choice!(<expr>)` pattern. Note that choice! must be used as a top level
+/// expression.
 fn extract_choice(stmt: &Stmt) -> Option<(&syn::Pat, &proc_macro2::TokenStream)> {
     match stmt {
         Stmt::Local(local) => {
@@ -137,10 +142,10 @@ fn extract_choice(stmt: &Stmt) -> Option<(&syn::Pat, &proc_macro2::TokenStream)>
     }
 }
 
-/// Extracts `require!(<predicate>)` pattern.
-fn extract_require(stmt: &Stmt) -> Option<Expr> {
-    match stmt {
-        Stmt::Macro(StmtMacro { mac, .. }) if mac.path.is_ident("require") => mac.parse_body().ok(),
-        _ => None,
-    }
-}
+//macro_rules! require {
+//    ($pred:expr) => {
+//        if !$pred {
+//            return None;
+//        }
+//    };
+//}
