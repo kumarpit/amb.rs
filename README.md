@@ -1,16 +1,10 @@
-```bash
-         _                  _   _         _                   _          _        
-        / /\               /\_\/\_\ _    / /\                /\ \       / /\      
-       / /  \             / / / / //\_\ / /  \              /  \ \     / /  \     
-      / / /\ \           /\ \/ \ \/ / // / /\ \            / /\ \ \   / / /\ \__  
-     / / /\ \ \         /  \____\__/ // / /\ \ \          / / /\ \_\ / / /\ \___\ 
-    / / /  \ \ \       / /\/________// / /\ \_\ \        / / /_/ / / \ \ \ \/___/ 
-   / / /___/ /\ \     / / /\/_// / // / /\ \ \___\      / / /__\/ /   \ \ \       
-  / / /_____/ /\ \   / / /    / / // / /  \ \ \__/     / / /_____/_    \ \ \      
- / /_________/\ \ \ / / /    / / // / /____\_\ \  _   / / /\ \ \ /_/\__/ / /      
-/ / /_       __\ \_\\/_/    / / // / /__________\/\_\/ / /  \ \ \\ \/___/ /       
-\_\___\     /____/_/        \/_/ \/_____________/\/_/\/_/    \_\/ \_____\/        
-                                                                                  
+```
+ ______     __    __     ______     ______     ______    
+/\  __ \   /\ "-./  \   /\  == \   /\  == \   /\  ___\   
+\ \  __ \  \ \ \-./\ \  \ \  __<   \ \  __<   \ \___  \  
+ \ \_\ \_\  \ \_\ \ \_\  \ \_____\  \ \_\ \_\  \/\_____\ 
+  \/_/\/_/   \/_/  \/_/   \/_____/   \/_/ /_/   \/_____/ 
+                                                                                                                                    
 ```
 
 An implementation for the `amb` operator for Rust. The operator and its usage is described in [Structure and Interpretations of Computer Programs - Chapter 4.3](https://sarabander.github.io/sicp/html/4_002e3.xhtml#g_t4_002e3). This was written as an exercise to learn more about procedural macros.
@@ -83,6 +77,35 @@ let solution = amb!({
 
     require!(is_valid_assignment(&assignment));
 
-    return assignment;
+    assignment
+})
+```
+
+And here is a solution to the 8 queens problem!
+
+```rust
+let solution = amb!({
+    let col1 = choice!(1..=8);
+    let col2 = choice!(1..=8);
+    let col3 = choice!(1..=8);
+    let col4 = choice!(1..=8);
+    let col5 = choice!(1..=8);
+    let col6 = choice!(1..=8);
+    let col7 = choice!(1..=8);
+    let col8 = choice!(1..=8);
+
+    let row_assignments = vec![col1, col2, col3, col4, col5, col6, col7, col8];
+
+    require!((1..=7).into_iter().all(|upto_column| {
+        (0..upto_column).into_iter().all(|curr_column| {
+            let row1 = row_assignments[curr_column] as usize;
+            let row2 = row_assignments[upto_column] as usize;
+
+            // Ensure queens are in different rows and not on the same diagonal
+            row1 != row2 && upto_column.abs_diff(curr_column) != row1.abs_diff(row2)
+        })
+    }));
+
+    row_assignments
 })
 ```
