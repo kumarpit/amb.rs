@@ -1,5 +1,5 @@
 use quote::quote;
-use syn::{Block, Expr, Stmt, StmtMacro, spanned::Spanned};
+use syn::{Block, Expr, Stmt, spanned::Spanned};
 
 /// The `amb!` macro enables backtracking search over a space of choices.
 ///

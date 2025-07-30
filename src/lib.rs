@@ -1,3 +1,11 @@
+/// The `amb!` macro enables backtracking search over a space of choices by providing an
+/// imeplementation of the `amb` operator.
+pub use amb::amb;
+
+/// Prunes the current execution path if the predicate is false.
+///
+/// This macro can only be used inside an `amb!` block.
+#[macro_export]
 macro_rules! require {
     ($pred:expr) => {
         if !$pred {
@@ -9,7 +17,6 @@ macro_rules! require {
 #[cfg(test)]
 mod tests {
     use amb::amb;
-    use enum_iterator::Sequence;
 
     ///////////////////////////
     // Simple Examples
