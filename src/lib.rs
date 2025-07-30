@@ -61,9 +61,7 @@ mod tests {
     // Map Coloring Example
     //////////////////////////
 
-    use std::collections::{HashMap, HashSet};
-
-    // TODO: I've got to figure out how to fix these clones
+    use std::collections::HashMap;
 
     #[test]
     fn map_coloring() {
@@ -85,71 +83,71 @@ mod tests {
             F,
         }
 
+        // Note: Assumes index is in bounds!!!
+        let colors = vec![Color::Red, Color::Yellow, Color::Green, Color::Blue];
+        let num_colors = colors.len();
+
+        let adjacency_list = HashMap::from([
+            (Node::A, vec![Node::B, Node::C, Node::D, Node::F]),
+            (Node::B, vec![Node::A, Node::C, Node::D]),
+            (Node::C, vec![Node::A, Node::B, Node::D, Node::E]),
+            (Node::D, vec![Node::A, Node::B, Node::C, Node::E, Node::F]),
+            (Node::E, vec![Node::C, Node::D, Node::F]),
+            (Node::F, vec![Node::A, Node::D, Node::E]),
+        ]);
+
+        // Need to define these closures outside nested iterators to avoid moving adjacency_list, colors into FnMuts
+
+        let get_color = |a: usize| colors[a];
+
+        // Given color assignments for each node, checks whether they satisy the constraint that no
+        // two adjacent nodes have the same color
+        let is_valid_assignment = |assignment: &HashMap<Node, Color>| {
+            adjacency_list
+                .iter()
+                .flat_map(|(node, neighbours)| {
+                    neighbours.iter().map(move |neighbour| (node, neighbour))
+                })
+                .all(|(node, neighbour)| {
+                    if let (Some(node_color), Some(neighbour_color)) =
+                        (assignment.get(node), assignment.get(neighbour))
+                    {
+                        node_color != neighbour_color
+                    } else {
+                        false
+                    }
+                })
+        };
+
         let solution = amb!({
-            let a = choice!(HashSet::from([
-                Color::Red,
-                Color::Green,
-                Color::Yellow,
-                Color::Blue
-            ]));
-            let b = choice!(HashSet::from([
-                Color::Red,
-                Color::Green,
-                Color::Yellow,
-                Color::Blue
-            ]));
-            let c = choice!(HashSet::from([
-                Color::Red,
-                Color::Green,
-                Color::Yellow,
-                Color::Blue
-            ]));
-            let d = choice!(HashSet::from([
-                Color::Red,
-                Color::Green,
-                Color::Yellow,
-                Color::Blue
-            ]));
-            let e = choice!(HashSet::from([
-                Color::Red,
-                Color::Green,
-                Color::Yellow,
-                Color::Blue
-            ]));
-            let f = choice!(HashSet::from([
-                Color::Red,
-                Color::Green,
-                Color::Yellow,
-                Color::Blue
-            ]));
+            let a = choice!(0..num_colors);
+            let b = choice!(0..num_colors);
+            let c = choice!(0..num_colors);
+            let d = choice!(0..num_colors);
+            let e = choice!(0..num_colors);
+            let f = choice!(0..num_colors);
 
             let assignment = HashMap::from([
-                (Node::A, a),
-                (Node::B, b),
-                (Node::C, c),
-                (Node::D, d),
-                (Node::E, e),
-                (Node::F, f),
+                (Node::A, get_color(a)),
+                (Node::B, get_color(b)),
+                (Node::C, get_color(c)),
+                (Node::D, get_color(d)),
+                (Node::E, get_color(e)),
+                (Node::F, get_color(f)),
             ]);
 
-            let adjacency_list = HashMap::from([
-                (Node::A, vec![Node::B, Node::C, Node::D, Node::F]),
-                (Node::B, vec![Node::A, Node::C, Node::D]),
-                (Node::C, vec![Node::A, Node::B, Node::D, Node::E]),
-                (Node::D, vec![Node::A, Node::B, Node::C, Node::E, Node::F]),
-                (Node::E, vec![Node::C, Node::D, Node::F]),
-                (Node::F, vec![Node::A, Node::D, Node::E]),
-            ]);
+            require!(is_valid_assignment(&assignment));
 
-            for (node, neighbours) in adjacency_list {
-                for neighbour in neighbours {
-                    require!(assignment.get(&node).unwrap() != assignment.get(&neighbour).unwrap());
-                }
-            }
-
-            return (a, b, c, d, e, f);
+            return (
+                assignment[&Node::A],
+                assignment[&Node::B],
+                assignment[&Node::C],
+                assignment[&Node::D],
+                assignment[&Node::E],
+                assignment[&Node::F],
+            );
         })
-        .next();
+        .collect::<Vec<_>>();
 
         println!("Solution: {:?}", solution);
     }

@@ -56,7 +56,7 @@ fn build_amb<'a, I>(stmts: I, final_expr: &Expr) -> proc_macro2::TokenStream
 where
     I: Iterator<Item = &'a Stmt> + Clone,
 {
-    let (_, expanded) = build_amb_rec(stmts, final_expr, true);
+    let (_, expanded) = build_amb_rec(stmts, final_expr);
     expanded
 }
 
@@ -64,7 +64,6 @@ where
 fn build_amb_rec<'a, I>(
     mut stmts: I,
     final_expr: &Expr,
-    first_call: bool,
 ) -> (IteratorStage, proc_macro2::TokenStream)
 where
     I: Iterator<Item = &'a Stmt> + Clone,
@@ -72,46 +71,30 @@ where
     match stmts.next() {
         Some(stmt) => {
             if let Some((pat, iterable)) = extract_choice(stmt) {
-                let (iterator_stage, inner) = build_amb_rec(stmts, final_expr, false);
+                let (iterator_stage, inner) = build_amb_rec(stmts, final_expr);
+                
                 return match iterator_stage {
                     IteratorStage::InnerMost => (
                         IteratorStage::Outer,
-                        if first_call {
-                        quote! {
-                            (#iterable).into_iter().filter_map(|#pat| {
-                                #inner
-                            })
-                        }
-
-                        } else {
-                        quote! {
-                            (#iterable).into_iter().filter_map(move |#pat| {
-                                #inner
-                            })
-                        }
-                        }
+                            quote! {
+                                (#iterable).into_iter().filter_map(move |#pat| {
+                                    #inner
+                                })
+                            }
                     ),
                     IteratorStage::Outer => (
                         IteratorStage::Outer,
-                        if first_call {
-                        quote! {
-                            (#iterable).into_iter().flat_map(|#pat| {
-                                #inner
-                            })
-                        }
-                        } else {
-                        quote! {
-                            (#iterable).into_iter().flat_map(move |#pat| {
-                                #inner
-                            })
-                        }
-                        }
+                            quote! {
+                                (#iterable).into_iter().flat_map(move |#pat| {
+                                    #inner
+                                })
+                            }
                     ),
                 };
             }
 
             // Fallback: treat as a normal statement
-            let (iterator_stage, inner) = build_amb_rec(stmts, final_expr, first_call);
+            let (iterator_stage, inner) = build_amb_rec(stmts, final_expr);
             (
                 iterator_stage,
                 quote!({

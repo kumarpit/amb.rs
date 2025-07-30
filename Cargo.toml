@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 amb = { path = './amb' }
+enum-iterator = "2.1.0"
