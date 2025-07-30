@@ -196,6 +196,46 @@ mod tests {
         })
         .next();
 
-        println!("Solution: {:?}", solution);
+        render_board(&solution.unwrap());
+    }
+
+    // FOR TESTING
+    // Given row assignments for a queen in each row, render a chess board of the form:
+    //  a b c d e f g h
+    // 8 . . Q . . . . .
+    // 7 . . . . . Q . .
+    // 6 . . . Q . . . .
+    // 5 . Q . . . . . .
+    // 4 . . . . . . . Q
+    // 3 . . . . Q . . .
+    // 2 . . . . . . Q .
+    // 1 Q . . . . . . .
+    fn render_board(solution: &[usize]) {
+        if solution.len() != 8 {
+            println!("Error: Solution must have exactly 8 values.");
+            return;
+        }
+
+        let queen_positions: std::collections::HashSet<(usize, usize)> = solution
+            .iter()
+            .enumerate()
+            .map(|(col, &row)| (row - 1, col))
+            .collect();
+
+        println!("  a b c d e f g h");
+
+        for row_idx in (0..8).rev() {
+            print!("{} ", row_idx + 1);
+
+            for col_idx in 0..8 {
+                let cell = (row_idx, col_idx);
+                if queen_positions.contains(&cell) {
+                    print!("Q ");
+                } else {
+                    print!(". ");
+                }
+            }
+            println!();
+        }
     }
 }
