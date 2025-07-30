@@ -14,9 +14,7 @@ pub fn amb(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let block = syn::parse_macro_input!(input as Block);
 
     match block.stmts.split_last() {
-        Some((Stmt::Expr(expr, None), rest)) => {
-            build_amb(rest.iter(), expr, IteratorStage::First).into()
-        }
+        Some((Stmt::Expr(expr, None), rest)) => build_amb(rest.iter(), expr).into(),
         Some((last_stmt, _)) => syn::Error::new(
             last_stmt.span(),
             "The amb! block must end with an expression",
@@ -29,57 +27,78 @@ pub fn amb(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum IteratorStage {
-    First,
-    Nested,
+    /// The innermost iterator must be combined with filter_map
+    InnerMost,
+    /// All outer iterators are combined with flat_map
+    Outer,
+}
+
+fn build_amb<'a, I>(stmts: I, final_expr: &Expr) -> proc_macro2::TokenStream
+where
+    I: Iterator<Item = &'a Stmt> + Clone,
+{
+    let (_, expanded) = build_amb_rec(stmts, final_expr);
+    expanded
 }
 
 /// Recursively desugars `amb!` block into nested iterators and conditions.
-fn build_amb<'a, I>(
+fn build_amb_rec<'a, I>(
     mut stmts: I,
     final_expr: &Expr,
-    stage: IteratorStage,
-) -> proc_macro2::TokenStream
+) -> (IteratorStage, proc_macro2::TokenStream)
 where
     I: Iterator<Item = &'a Stmt> + Clone,
 {
     match stmts.next() {
         Some(stmt) => {
             if let Some((pat, iterable)) = extract_choice(stmt) {
-                let inner = build_amb(stmts, final_expr, IteratorStage::Nested);
-                return match stage {
-                    IteratorStage::First => quote! {
-                        (#iterable).into_iter().flat_map(move |#pat| {
-                            #inner
-                        })
-                    },
-                    IteratorStage::Nested => quote! {
-                        (#iterable).into_iter().filter_map(move |#pat| {
-                            #inner
-                        })
-                    },
+                let (iterator_stage, inner) = build_amb_rec(stmts, final_expr);
+                return match iterator_stage {
+                    IteratorStage::InnerMost => (
+                        IteratorStage::Outer,
+                        quote! {
+                            (#iterable).into_iter().filter_map(move |#pat| {
+                                #inner
+                            })
+                        },
+                    ),
+                    IteratorStage::Outer => (
+                        IteratorStage::Outer,
+                        quote! {
+                            (#iterable).into_iter().flat_map(move |#pat| {
+                                #inner
+                            })
+                        },
+                    ),
                 };
             }
 
             if let Some(pred) = extract_require(stmt) {
-                let inner = build_amb(stmts, final_expr, stage);
-                return quote! {
-                    if #pred {
-                        #inner
-                    } else {
-                        None
-                    }
-                };
+                let (iterator_stage, inner) = build_amb_rec(stmts, final_expr);
+                return (
+                    iterator_stage,
+                    quote! {
+                        if #pred {
+                            #inner
+                        } else {
+                            None
+                        }
+                    },
+                );
             }
 
             // Fallback: treat as a normal statement
-            let inner = build_amb(stmts, final_expr, stage);
-            quote!({
-                #stmt
-                #inner
-            })
+            let (iterator_stage, inner) = build_amb_rec(stmts, final_expr);
+            (
+                iterator_stage,
+                quote!({
+                    #stmt
+                    #inner
+                }),
+            )
         }
 
-        None => quote!(Some(#final_expr)),
+        None => (IteratorStage::InnerMost, quote!(Some(#final_expr))),
     }
 }
 
