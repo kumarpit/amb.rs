@@ -100,6 +100,7 @@ let solution = amb!({
         (0..upto_column).into_iter().all(|curr_column| {
             let row1 = row_assignments[curr_column];
             let row2 = row_assignments[upto_column];
+
             // Ensure queens are in different rows and not on the same diagonal
             row1 != row2 && upto_column.abs_diff(curr_column) != row1.abs_diff(row2)
         })
