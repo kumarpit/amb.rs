@@ -9,6 +9,7 @@ macro_rules! require {
 #[cfg(test)]
 mod tests {
     use amb::amb;
+    use enum_iterator::Sequence;
 
     ///////////////////////////
     // Simple Examples
@@ -114,7 +115,7 @@ mod tests {
                     {
                         node_color != neighbour_color
                     } else {
-                        false
+                        false // Should never be here
                     }
                 })
         };
@@ -147,7 +148,46 @@ mod tests {
                 assignment[&Node::F],
             );
         })
-        .collect::<Vec<_>>();
+        .next();
+
+        println!("Solution: {:?}", solution);
+    }
+
+    ///////////////////////////
+    // 8 Queens
+    //////////////////////////
+
+    #[test]
+    fn eight_queens() {
+        let solution = amb!({
+            let col1 = choice!(1..=8);
+            let col2 = choice!(1..=8);
+            let col3 = choice!(1..=8);
+            let col4 = choice!(1..=8);
+            let col5 = choice!(1..=8);
+            let col6 = choice!(1..=8);
+            let col7 = choice!(1..=8);
+            let col8 = choice!(1..=8);
+
+            let row_assignments_for_column = vec![col1, col2, col3, col4, col5, col6, col7, col8];
+
+            require!((1..=7).into_iter().all(|upto_column| {
+                (0..upto_column).into_iter().all(|curr_column| {
+                    // Ensure different rows
+                    row_assignments_for_column[curr_column]
+                        != row_assignments_for_column[upto_column]
+
+                        // Ensure not on same diagonals
+                        && (upto_column as i32 - curr_column as i32).abs()
+                            != (row_assignments_for_column[upto_column] as i32
+                                - row_assignments_for_column[curr_column] as i32)
+                                .abs()
+                })
+            }));
+
+            row_assignments_for_column
+        })
+        .next();
 
         println!("Solution: {:?}", solution);
     }
